@@ -1,0 +1,57 @@
+{
+  "name": "local-browser-mcp",
+  "version": "0.1.0",
+  "description": "A headless, agent-controllable real browser as an MCP server — for local dev servers and allowlisted hosts. No VS Code required.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "playwright",
+    "browser",
+    "localhost",
+    "claude",
+    "agent",
+    "headless"
+  ],
+  "homepage": "https://github.com/NolanLT/local-browser-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/NolanLT/local-browser-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NolanLT/local-browser-mcp.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Nolan Baxter"
+  },
+  "type": "commonjs",
+  "bin": {
+    "local-browser-mcp": "dist/server.cjs"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/postinstall.cjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.0",
+    "zod": "^3.23.8"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

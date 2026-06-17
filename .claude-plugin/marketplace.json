@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "local-browser-marketplace",
+  "description": "Marketplace for the Local Browser MCP plugin — a headless agent-controllable browser, no VS Code required.",
+  "owner": {
+    "name": "Nolan Baxter"
+  },
+  "plugins": [
+    {
+      "name": "local-browser",
+      "description": "A headless, agent-controllable real browser baked into Claude (no VS Code). Drive localhost dev servers and allowlisted online hosts.",
+      "author": {
+        "name": "Nolan Baxter"
+      },
+      "category": "development",
+      "source": "./plugin/local-browser"
+    }
+  ]
+}

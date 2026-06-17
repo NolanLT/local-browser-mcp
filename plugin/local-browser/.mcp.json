@@ -1,0 +1,11 @@
+{
+  "local-browser": {
+    "command": "npx",
+    "args": ["-y", "local-browser-mcp"],
+    "env": {
+      "LOCAL_BROWSER_ENGINE": "chromium",
+      "LOCAL_BROWSER_ALLOWED_HOSTS": "localhost,127.0.0.1",
+      "LOCAL_BROWSER_ALLOW_ALL": "false"
+    }
+  }
+}

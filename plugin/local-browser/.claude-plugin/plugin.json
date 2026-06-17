@@ -1,0 +1,8 @@
+{
+  "name": "local-browser",
+  "description": "A headless, agent-controllable real browser baked directly into Claude — no VS Code required. Navigate, click, hover, fill, type, eval, screenshot, snapshot the DOM, and inspect console/network on your local dev servers (and allowlisted online hosts). Claude launches the browser itself and it's torn down when the session ends.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Nolan Baxter"
+  }
+}
