@@ -1,5 +1,9 @@
 # Local Browser MCP
 
+[![CI](https://github.com/NolanLT/local-browser-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/NolanLT/local-browser-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+
 A **headless, agent-controllable real browser** as an [MCP](https://modelcontextprotocol.io)
 server. It gives an AI agent (Claude Code, or any MCP client) a real Playwright browser pointed at
 your **local dev servers** — and any hosts you explicitly allow — with **no VS Code and no GUI
@@ -105,6 +109,15 @@ Run it directly for a stdio smoke test:
 node dist/server.cjs
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev/release workflow.
+
+## Project
+
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+
 ## License
 
-MIT
+[MIT](LICENSE)
