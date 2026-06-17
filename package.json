@@ -38,8 +38,8 @@
     "build": "node esbuild.js --production",
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/postinstall.cjs",
-    "prepublishOnly": "npm run build"
+    "prepare": "npm run build",
+    "postinstall": "node scripts/postinstall.cjs"
   },
   "dependencies": {
     "playwright": "^1.49.0"

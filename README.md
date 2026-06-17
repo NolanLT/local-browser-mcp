@@ -16,15 +16,16 @@ install.
 
 ### Claude Code / any MCP client (recommended)
 
-Add it to your MCP config (e.g. `~/.claude/mcp.json`, a project `.mcp.json`, or your client's
-equivalent):
+Add it to your MCP config (e.g. a project `.mcp.json`, your user config via
+`claude mcp add`, or your client's equivalent). `npx` runs it straight from this GitHub repo —
+**no npm registry account needed** (requires `git` on the machine):
 
 ```jsonc
 {
   "mcpServers": {
     "local-browser": {
       "command": "npx",
-      "args": ["-y", "local-browser-mcp"],
+      "args": ["-y", "github:NolanLT/local-browser-mcp"],
       "env": {
         "LOCAL_BROWSER_ALLOWED_HOSTS": "localhost,127.0.0.1"
       }
@@ -33,7 +34,11 @@ equivalent):
 }
 ```
 
-Restart your client. The `browser_*` tools appear with no other setup.
+Restart your client. The `browser_*` tools appear with no other setup. (First run installs
+dependencies and downloads Chromium, then caches.)
+
+> If the package is also published to npm, you can swap the arg for the shorter
+> `["-y", "local-browser-mcp"]`.
 
 ### As a Claude Code plugin (GitHub marketplace)
 
