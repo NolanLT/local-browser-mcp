@@ -39,6 +39,20 @@ export interface TlsOptions {
   key: Buffer;
 }
 
+export interface StartOptions {
+  /** Bind address. Default "127.0.0.1" (loopback). Use "0.0.0.0" for a directly-hosted box. */
+  host?: string;
+  /** TLS cert/key to serve HTTPS directly (otherwise terminate TLS at a reverse proxy/tunnel). */
+  tls?: TlsOptions;
+  /**
+   * If set, every request except GET /health must carry `Authorization: Bearer <token>`.
+   * REQUIRED before any public exposure — the HTTP path has no per-call user prompt.
+   */
+  bearerToken?: string;
+  /** Optional UI hooks (unused in the standalone build). */
+  hooks?: ServerHooks;
+}
+
 export interface ServerHooks {
   /** Ensure the (headless) browser is running and preload the default URL. */
   onShowPanel?: () => void | Promise<void>;
@@ -323,17 +337,21 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
 }
 
 /**
- * Start an HTTP server exposing the MCP server over SSE.
- *   GET  /sse       → open the event stream
- *   POST /messages  → client → server JSON-RPC messages (?sessionId=...)
- *   GET  /health    → liveness check
+ * Start an HTTP server exposing the MCP server.
+ *   POST/GET/DELETE /mcp  → Streamable HTTP (current standard; claude.ai connectors)
+ *   GET  /sse             → open the legacy SSE event stream
+ *   POST /messages        → SSE client → server JSON-RPC messages (?sessionId=...)
+ *   GET  /health          → liveness check (always open, no secrets)
+ *
+ * Bind host, TLS, and a bearer token are configurable via `opts`. When a bearer
+ * token is set, every request except /health must send `Authorization: Bearer <token>`.
  */
 export async function startMcpServer(
   browser: LocalBrowser,
   port: number,
-  tls?: TlsOptions,
-  hooks: ServerHooks = {}
+  opts: StartOptions = {}
 ): Promise<McpServerHandle> {
+  const { host = "127.0.0.1", tls, bearerToken, hooks = {} } = opts;
   const transports = new Map<string, SSEServerTransport>();
   const streamable = new Map<string, StreamableHTTPServerTransport>();
   const scheme = tls ? "https" : "http";
@@ -352,6 +370,14 @@ export async function startMcpServer(
           sessions: { streamableHttp: streamable.size, sse: transports.size }
         })
       );
+      return;
+    }
+
+    // Bearer-token gate. Everything past /health requires the token when one is
+    // configured — the HTTP path has no per-call user prompt the way stdio does.
+    if (bearerToken && req.headers["authorization"] !== `Bearer ${bearerToken}`) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "unauthorized" }));
       return;
     }
 
@@ -448,11 +474,11 @@ export async function startMcpServer(
 
   await new Promise<void>((resolve, reject) => {
     httpServer.once("error", reject);
-    httpServer.listen(port, "127.0.0.1", () => resolve());
+    httpServer.listen(port, host, () => resolve());
   });
 
   return {
-    url: `${scheme}://127.0.0.1:${port}/mcp`,
+    url: `${scheme}://${host}:${port}/mcp`,
     port,
     close: () =>
       new Promise<void>((resolve) => {

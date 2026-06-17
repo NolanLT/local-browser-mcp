@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-17
+
+### Added
+- **HTTP / connector mode.** Set `LOCAL_BROWSER_HTTP_PORT` to serve the same tools over
+  Streamable HTTP at `/mcp` (for claude.ai web/mobile, Cowork, and Desktop custom connectors)
+  instead of stdio. `LOCAL_BROWSER_HTTP_HOST` sets the bind address (default `127.0.0.1`).
+- **Bearer-token authentication** for the HTTP path via `LOCAL_BROWSER_TOKEN` — every request
+  except `GET /health` must send `Authorization: Bearer <token>` when set. Required before any
+  public exposure.
+
+### Changed
+- `startMcpServer(browser, port, opts)` now takes an options object (`host`, `tls`, `bearerToken`,
+  `hooks`) instead of positional `tls`/`hooks` args.
+- Default (no `LOCAL_BROWSER_HTTP_PORT`) behavior is unchanged: stdio mode for Claude Code / Desktop.
+
 ## [0.1.0] - 2026-06-16
 
 Initial release — a headless, agent-controllable real browser as a stdio MCP server.
@@ -28,5 +43,6 @@ No VS Code required.
 - **Claude Code plugin marketplace** (`/plugin marketplace add NolanLT/local-browser-mcp`).
 - Chromium binary downloaded automatically on install (`postinstall`), skippable via env.
 
-[Unreleased]: https://github.com/NolanLT/local-browser-mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/NolanLT/local-browser-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/NolanLT/local-browser-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/NolanLT/local-browser-mcp/releases/tag/v0.1.0

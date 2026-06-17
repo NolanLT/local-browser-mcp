@@ -61,6 +61,44 @@ The plugin's MCP server is the same `npx` invocation above.
 | `LOCAL_BROWSER_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated navigation allowlist |
 | `LOCAL_BROWSER_ALLOW_ALL` | `false` | `true` allows **any** http/https host (see Security) |
 | `LOCAL_BROWSER_SKIP_BROWSER_DOWNLOAD` | — | `1` to skip the Chromium download on install |
+| `LOCAL_BROWSER_HTTP_PORT` | — | If set, run in **HTTP mode** on this port (else stdio) |
+| `LOCAL_BROWSER_HTTP_HOST` | `127.0.0.1` | HTTP bind address; use `0.0.0.0` for a directly-hosted box |
+| `LOCAL_BROWSER_TOKEN` | — | If set, HTTP requests need `Authorization: Bearer <token>` |
+
+## Remote / connector mode (claude.ai web & mobile, Cowork, Desktop connectors)
+
+stdio only reaches clients on the same machine. To use this from **claude.ai** (web/mobile),
+**Cowork**, or a **Desktop custom connector**, run it in **HTTP mode** and expose it over public
+HTTPS — Anthropic's cloud connects to *your* endpoint, so it must be reachable and authenticated.
+
+> ⚠️ **A public endpoint can drive a real browser, including `browser_eval`.** Always set
+> `LOCAL_BROWSER_TOKEN` and keep a tight `LOCAL_BROWSER_ALLOWED_HOSTS` (and `LOCAL_BROWSER_ALLOW_ALL=false`)
+> before exposing it. Without a token the HTTP path is unauthenticated.
+
+### Quick start (tunnel)
+
+```bash
+# 1. Generate a secret and run in HTTP mode
+export LOCAL_BROWSER_TOKEN=$(openssl rand -hex 32)
+LOCAL_BROWSER_HTTP_PORT=3000 node dist/server.cjs
+#   → [local-browser] HTTP MCP ready on http://127.0.0.1:3000/mcp
+
+# 2. In another shell, expose it over public HTTPS (TLS terminates at the tunnel)
+cloudflared tunnel --url http://127.0.0.1:3000     # or: ngrok http 3000
+#   → https://something.trycloudflare.com
+```
+
+Then register the connector in claude.ai (also Desktop/Cowork):
+**Customize → Connectors → "+"** → name it, enter the public **`https://…/mcp`** URL, and put your
+token in the auth/Bearer field → Add → enable it per-conversation via the **"+"** in the composer.
+
+### Production (always-on)
+
+Host on a box that can run Chromium (VPS, Fly.io, Render, a Playwright-deps container — *not*
+serverless edge, which can't spawn Chromium). Set `LOCAL_BROWSER_HTTP_HOST=0.0.0.0`, keep
+`LOCAL_BROWSER_TOKEN` on, and terminate TLS at a reverse proxy (Caddy/nginx) or pass real certs.
+
+`GET /health` is always open (no secrets) for setup checks; everything else requires the token.
 
 ## Tools
 
@@ -94,6 +132,9 @@ The plugin's MCP server is the same `npx` invocation above.
   injection surface) and the agent can script it — keep `ALLOW_ALL` off unless you mean it.
 - There's no built-in approval dialog (the server is headless). When run under Claude Code, host
   additions and eval calls are gated by Claude Code's own per-tool permission prompts.
+- **In HTTP mode there is no per-call prompt** — the bearer token (`LOCAL_BROWSER_TOKEN`) is the
+  gate. Set it before exposing the endpoint publicly, and keep the host allowlist tight. See
+  [Remote / connector mode](#remote--connector-mode-claudeai-web--mobile-cowork-desktop-connectors).
 
 ## Develop
 
