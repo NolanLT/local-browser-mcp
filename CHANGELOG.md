@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-04
+
 ### Added
 - **Tabs & popups.** `browser_tabs`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`.
   Popups and `target=_blank` links are auto-tracked and become the active tab.
@@ -23,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Dependency updates: `@modelcontextprotocol/sdk` ^1.30, `zod` ^4, `playwright` ^1.62,
   `esbuild` ^0.28, `@types/node` ^22. TypeScript held at ^5.5 (TS 7 deferred).
+
+### Security
+- Patched transitive dependencies flagged by Dependabot (all pulled in via
+  `@modelcontextprotocol/sdk`): `hono` 4.13.0, `@hono/node-server` 2.1.0, `fast-uri` 3.1.5,
+  `ip-address` 10.4.0. `npm audit` now reports 0 vulnerabilities. Note: the SDK's Hono HTTP
+  server and rate-limiter are not on this package's code path (HTTP mode uses its own server),
+  but the dependencies are patched regardless.
 
 ## [0.2.0] - 2026-06-17
 
