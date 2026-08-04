@@ -105,18 +105,22 @@ serverless edge, which can't spawn Chromium). Set `LOCAL_BROWSER_HTTP_HOST=0.0.0
 | Tool | Purpose |
 |------|---------|
 | `browser_navigate({ url })` | Go to a URL (allowlist-validated) |
-| `browser_screenshot({ fullPage?, selector? })` | PNG returned to the agent |
+| `browser_screenshot({ fullPage?, selector?, format?, quality? })` | Image to the agent; `format: "jpeg"` (+`quality` 1-100) for lighter captures, else PNG |
 | `browser_snapshot()` | Flat DOM/a11y snapshot `{ tag, role, text, ref }` |
 | `browser_click({ selector \| ref })` | Click an element |
 | `browser_hover({ selector \| ref })` | Hover (e.g. open a dropdown) |
 | `browser_fill({ selector, value })` | Fill an input |
 | `browser_type({ text })` | Type into the focused element |
+| `browser_press_key({ key })` | Press a key/chord (Enter, Tab, Escape, Control+A, …) |
 | `browser_eval({ expression })` | Run JS in the page, return JSON result |
 | `browser_console()` / `browser_network()` | Buffered console / recent requests |
 | `browser_wait_for({ selector?, text?, timeoutMs? })` | Wait for a condition |
 | `browser_resize({ width, height })` | Resize the viewport |
 | `browser_reload()` / `browser_back()` / `browser_forward()` | History nav |
 | `browser_get_text()` | Visible page text |
+| `browser_tabs()` / `browser_new_tab({ url? })` / `browser_switch_tab({ index })` / `browser_close_tab({ index? })` | Tabs & popups |
+| `browser_dialogs()` / `browser_set_dialog_behavior({ behavior })` | JS dialogs (auto-handled; accept/dismiss) |
+| `browser_downloads()` | Files downloaded this session (saved to `LOCAL_BROWSER_DOWNLOAD_DIR`) |
 | `browser_allow_host` / `browser_disallow_host` / `browser_list_allowed` | Allowlist management |
 
 `ref` values come from `browser_snapshot()` (elements are tagged with `data-lbmcp-ref`), so

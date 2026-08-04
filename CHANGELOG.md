@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tabs & popups.** `browser_tabs`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab`.
+  Popups and `target=_blank` links are auto-tracked and become the active tab.
+- **`browser_press_key`** — press a key or chord (Enter, Tab, Escape, ArrowDown, Control+A, …),
+  e.g. to submit a form without a mouse.
+- **Dialog handling.** JS dialogs (alert/confirm/prompt) are auto-handled so pages never hang;
+  `browser_dialogs` lists them and `browser_set_dialog_behavior` switches accept/dismiss
+  (beforeunload is always dismissed).
+- **Downloads.** Files are captured to a download directory (`LOCAL_BROWSER_DOWNLOAD_DIR`,
+  default `<tmp>/local-browser-downloads`); `browser_downloads` lists them.
+- **Screenshot format.** `browser_screenshot` accepts `format: "jpeg"` and `quality` (1-100) for
+  lighter, faster captures; PNG remains the default.
+
+### Changed
+- Dependency updates: `@modelcontextprotocol/sdk` ^1.30, `zod` ^4, `playwright` ^1.62,
+  `esbuild` ^0.28, `@types/node` ^22. TypeScript held at ^5.5 (TS 7 deferred).
+
 ## [0.2.0] - 2026-06-17
 
 ### Added

@@ -7,6 +7,9 @@ import {
   chromium,
   LaunchOptions
 } from "playwright";
+import * as os from "os";
+import * as path from "path";
+import * as fs from "fs";
 
 export type Engine = "firefox" | "webkit" | "chromium";
 
@@ -31,12 +34,37 @@ export interface SnapshotNode {
   text: string;
 }
 
+export interface DialogEntry {
+  type: string;
+  message: string;
+  action: "accepted" | "dismissed";
+  at: number;
+}
+
+export interface DownloadEntry {
+  url: string;
+  filename: string;
+  path: string;
+  at: number;
+}
+
+export interface TabInfo {
+  index: number;
+  url: string;
+  title: string;
+  active: boolean;
+}
+
+export type DialogBehavior = "accept" | "dismiss";
+
 export interface BrowserOptions {
   engine: Engine;
   allowedHosts: string[];
   allowAllHosts?: boolean;
   width?: number;
   height?: number;
+  /** Directory downloads are saved to. Defaults to <tmp>/local-browser-downloads. */
+  downloadDir?: string;
 }
 
 const MAX_BUFFER = 200;
@@ -52,15 +80,20 @@ export class LocalBrowser {
   private page?: Page;
   private readonly console: ConsoleEntry[] = [];
   private readonly network: NetworkEntry[] = [];
+  private readonly dialogs: DialogEntry[] = [];
+  private readonly downloads: DownloadEntry[] = [];
   private _currentUrl = "about:blank";
   // Mutable so the allowlist can be changed at runtime (via tools / settings)
   // without relaunching the browser.
   private allowed: Set<string>;
   private allowAll: boolean;
+  private dialogBehavior: DialogBehavior = "accept";
+  private readonly downloadDir: string;
 
   constructor(private readonly opts: BrowserOptions) {
     this.allowed = new Set(opts.allowedHosts);
     this.allowAll = !!opts.allowAllHosts;
+    this.downloadDir = opts.downloadDir || path.join(os.tmpdir(), "local-browser-downloads");
   }
 
   get engine(): Engine {
@@ -136,10 +169,17 @@ export class LocalBrowser {
         width: this.opts.width ?? 1280,
         height: this.opts.height ?? 800
       },
-      ignoreHTTPSErrors: true
+      ignoreHTTPSErrors: true,
+      acceptDownloads: true
+    });
+    // Wire every page opened in this context — the first tab, agent-opened tabs,
+    // and popups (target=_blank). The newest page becomes active, matching how a
+    // real browser surfaces a new tab/popup.
+    this.context.on("page", (p) => {
+      this.wirePage(p);
+      this.page = p;
     });
     this.page = await this.context.newPage();
-    this.wirePage(this.page);
   }
 
   private wirePage(page: Page): void {
@@ -178,6 +218,42 @@ export class LocalBrowser {
     page.on("framenavigated", (frame) => {
       if (frame === this.page?.mainFrame()) {
         this._currentUrl = frame.url();
+      }
+    });
+    // Auto-handle JS dialogs so pages never hang waiting on alert/confirm/prompt.
+    page.on("dialog", async (dialog) => {
+      // beforeunload is always dismissed (don't leave the page unexpectedly).
+      const accept = this.dialogBehavior === "accept" && dialog.type() !== "beforeunload";
+      this.push(this.dialogs, {
+        type: dialog.type(),
+        message: dialog.message(),
+        action: accept ? "accepted" : "dismissed",
+        at: Date.now()
+      });
+      try {
+        await (accept ? dialog.accept() : dialog.dismiss());
+      } catch {
+        /* dialog may already be gone */
+      }
+    });
+    // Capture downloads to the download directory.
+    page.on("download", async (download) => {
+      try {
+        fs.mkdirSync(this.downloadDir, { recursive: true });
+        const filename = download.suggestedFilename();
+        const dest = path.join(this.downloadDir, `${Date.now()}-${filename}`);
+        await download.saveAs(dest);
+        this.push(this.downloads, { url: download.url(), filename, path: dest, at: Date.now() });
+      } catch {
+        /* download failed/canceled */
+      }
+    });
+    // If the active page closes (e.g. a popup), fall back to another open page.
+    page.on("close", () => {
+      if (this.page === page) {
+        const others = (this.context?.pages() ?? []).filter((p) => !p.isClosed());
+        this.page = others[others.length - 1];
+        this._currentUrl = this.page?.url() ?? "about:blank";
       }
     });
   }
@@ -249,13 +325,20 @@ export class LocalBrowser {
     await (await this.ready()).goForward({ waitUntil: "domcontentloaded" });
   }
 
-  async screenshot(opts: { fullPage?: boolean; selector?: string } = {}): Promise<Buffer> {
+  async screenshot(
+    opts: { fullPage?: boolean; selector?: string; format?: "png" | "jpeg"; quality?: number } = {}
+  ): Promise<{ buffer: Buffer; mimeType: string }> {
     const page = await this.ready();
-    if (opts.selector) {
-      const el = page.locator(opts.selector).first();
-      return el.screenshot({ type: "png" });
-    }
-    return page.screenshot({ type: "png", fullPage: !!opts.fullPage });
+    const type = opts.format === "jpeg" ? "jpeg" : "png";
+    // JPEG is much lighter to encode/transfer than PNG — good for quick captures.
+    const shotOpts =
+      type === "jpeg"
+        ? { type: "jpeg" as const, quality: Math.min(100, Math.max(1, opts.quality ?? 70)) }
+        : { type: "png" as const };
+    const buffer = opts.selector
+      ? await page.locator(opts.selector).first().screenshot(shotOpts)
+      : await page.screenshot({ ...shotOpts, fullPage: !!opts.fullPage });
+    return { buffer, mimeType: type === "jpeg" ? "image/jpeg" : "image/png" };
   }
 
   async click(opts: { selector?: string; ref?: string }): Promise<void> {
@@ -306,6 +389,91 @@ export class LocalBrowser {
   async resize(width: number, height: number): Promise<void> {
     const page = await this.ready();
     await page.setViewportSize({ width, height });
+  }
+
+  /** Press a key or chord (e.g. "Enter", "Tab", "Escape", "Control+A"). */
+  async pressKey(key: string): Promise<void> {
+    const page = await this.ready();
+    await page.keyboard.press(key);
+  }
+
+  // --- Tabs ---
+
+  private requireContext(): BrowserContext {
+    if (!this.context) {
+      throw new Error("Browser is not running.");
+    }
+    return this.context;
+  }
+
+  async listTabs(): Promise<TabInfo[]> {
+    await this.ready();
+    const pages = this.requireContext().pages();
+    return Promise.all(
+      pages.map(async (p, index) => ({
+        index,
+        url: p.url(),
+        title: await p.title().catch(() => ""),
+        active: p === this.page
+      }))
+    );
+  }
+
+  async newTab(url?: string): Promise<TabInfo[]> {
+    await this.ensureStarted();
+    // The context "page" handler wires it and makes it active.
+    const page = await this.requireContext().newPage();
+    this.page = page;
+    this._currentUrl = "about:blank";
+    if (url) {
+      await this.navigate(url);
+    }
+    return this.listTabs();
+  }
+
+  async switchTab(index: number): Promise<TabInfo[]> {
+    await this.ready();
+    const pages = this.requireContext().pages();
+    const page = pages[index];
+    if (!page) {
+      throw new Error(`No tab at index ${index} (have ${pages.length}).`);
+    }
+    this.page = page;
+    this._currentUrl = page.url();
+    await page.bringToFront().catch(() => undefined);
+    return this.listTabs();
+  }
+
+  async closeTab(index?: number): Promise<TabInfo[]> {
+    await this.ready();
+    const ctx = this.requireContext();
+    const pages = ctx.pages();
+    const target = index === undefined ? this.page : pages[index];
+    if (!target) {
+      throw new Error(`No tab at index ${index}.`);
+    }
+    await target.close();
+    const remaining = ctx.pages().filter((p) => !p.isClosed());
+    if (remaining.length === 0) {
+      this.page = await ctx.newPage(); // never leave zero tabs
+      this._currentUrl = "about:blank";
+    } else if (!this.page || this.page.isClosed()) {
+      this.page = remaining[remaining.length - 1];
+      this._currentUrl = this.page.url();
+    }
+    return this.listTabs();
+  }
+
+  // --- Dialogs & downloads ---
+
+  setDialogBehavior(behavior: DialogBehavior): void {
+    this.dialogBehavior = behavior;
+  }
+  getDialogs(): DialogEntry[] {
+    return [...this.dialogs];
+  }
+  getDownloads(): DownloadEntry[] {
+    return [...this.downloads];
   }
 
   /**

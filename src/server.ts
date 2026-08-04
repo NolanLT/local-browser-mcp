@@ -21,6 +21,7 @@
  *   LOCAL_BROWSER_HTTP_PORT      if set, run HTTP mode on this port (else stdio)
  *   LOCAL_BROWSER_HTTP_HOST      HTTP bind address (default 127.0.0.1; "0.0.0.0" for a public box)
  *   LOCAL_BROWSER_TOKEN          if set, HTTP requests need `Authorization: Bearer <token>`
+ *   LOCAL_BROWSER_DOWNLOAD_DIR   where downloads are saved (default <tmp>/local-browser-downloads)
  *
  * In stdio mode there's no GUI, so the confirmation toasts (allow-host,
  * confirm-eval) are not wired — those gates fall back to Claude Code's own
@@ -49,7 +50,8 @@ async function main(): Promise<void> {
   const browser = new LocalBrowser({
     engine: parseEngine(process.env.LOCAL_BROWSER_ENGINE),
     allowedHosts: parseHosts(process.env.LOCAL_BROWSER_ALLOWED_HOSTS),
-    allowAllHosts: /^(1|true|yes)$/i.test(process.env.LOCAL_BROWSER_ALLOW_ALL ?? "")
+    allowAllHosts: /^(1|true|yes)$/i.test(process.env.LOCAL_BROWSER_ALLOW_ALL ?? ""),
+    downloadDir: process.env.LOCAL_BROWSER_DOWNLOAD_DIR || undefined
   });
 
   const httpPort = process.env.LOCAL_BROWSER_HTTP_PORT;

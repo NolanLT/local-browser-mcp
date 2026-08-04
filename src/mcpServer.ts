@@ -73,11 +73,11 @@ function text(value: unknown) {
   return { content: [{ type: "text" as const, text: s }] };
 }
 
-function pngImage(buf: Buffer, note?: string) {
+function imageContent(buf: Buffer, mimeType: string, note?: string) {
   const content: Array<
     | { type: "image"; data: string; mimeType: string }
     | { type: "text"; text: string }
-  > = [{ type: "image", data: buf.toString("base64"), mimeType: "image/png" }];
+  > = [{ type: "image", data: buf.toString("base64"), mimeType }];
   if (note) {
     content.unshift({ type: "text", text: note });
   }
@@ -126,15 +126,17 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
 
   server.tool(
     "browser_screenshot",
-    "Capture a PNG screenshot of the current page (optionally full page or a single element).",
+    "Capture a screenshot of the current page (optionally full page or a single element). Use format 'jpeg' (with optional quality 1-100) for a lighter, faster capture; 'png' (default) is lossless.",
     {
       fullPage: z.boolean().optional(),
-      selector: z.string().optional()
+      selector: z.string().optional(),
+      format: z.enum(["png", "jpeg"]).optional(),
+      quality: z.number().min(1).max(100).optional().describe("JPEG quality 1-100 (default 70); ignored for png")
     },
-    async ({ fullPage, selector }) => {
-      const buf = await browser.screenshot({ fullPage, selector });
+    async ({ fullPage, selector, format, quality }) => {
+      const { buffer, mimeType } = await browser.screenshot({ fullPage, selector, format, quality });
       act(selector ? `Screenshot of ${selector}` : "Took a screenshot");
-      return pngImage(buf, `Screenshot of ${browser.currentUrl}`);
+      return imageContent(buffer, mimeType, `Screenshot of ${browser.currentUrl}`);
     }
   );
 
@@ -199,6 +201,17 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
       await browser.type(t);
       act(`Typed ${t.length} character${t.length === 1 ? "" : "s"}`);
       return text({ typed: t.length });
+    }
+  );
+
+  server.tool(
+    "browser_press_key",
+    "Press a key or chord on the keyboard (e.g. \"Enter\", \"Tab\", \"Escape\", \"ArrowDown\", \"Control+A\"). Useful to submit forms or navigate without a mouse.",
+    { key: z.string().describe('Key name or chord, e.g. "Enter" or "Control+A"') },
+    async ({ key }) => {
+      await browser.pressKey(key);
+      act(`Pressed ${key}`);
+      return text({ pressed: key });
     }
   );
 
@@ -293,6 +306,74 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
       act("Read the page text");
       return text(body);
     }
+  );
+
+  // --- Tabs ---
+
+  server.tool(
+    "browser_tabs",
+    "List open tabs (index, url, title, and which is active).",
+    {},
+    async () => text(await browser.listTabs())
+  );
+
+  server.tool(
+    "browser_new_tab",
+    "Open a new tab (optionally navigating to a URL) and make it active. Returns the updated tab list.",
+    { url: z.string().optional() },
+    async ({ url }) => {
+      const tabs = await browser.newTab(url);
+      act(url ? `Opened a new tab at ${url}` : "Opened a new tab");
+      return text(tabs);
+    }
+  );
+
+  server.tool(
+    "browser_switch_tab",
+    "Switch the active tab by index (see browser_tabs).",
+    { index: z.number() },
+    async ({ index }) => {
+      const tabs = await browser.switchTab(index);
+      act(`Switched to tab ${index}`);
+      return text(tabs);
+    }
+  );
+
+  server.tool(
+    "browser_close_tab",
+    "Close a tab by index, or the active tab if no index is given. Returns the updated tab list.",
+    { index: z.number().optional() },
+    async ({ index }) => {
+      const tabs = await browser.closeTab(index);
+      act(index === undefined ? "Closed the active tab" : `Closed tab ${index}`);
+      return text(tabs);
+    }
+  );
+
+  // --- Dialogs & downloads ---
+
+  server.tool(
+    "browser_dialogs",
+    "Return JS dialogs (alert/confirm/prompt/beforeunload) the page has raised, and how each was handled.",
+    {},
+    async () => text(browser.getDialogs())
+  );
+
+  server.tool(
+    "browser_set_dialog_behavior",
+    "Set how JS dialogs are auto-handled: 'accept' (default) or 'dismiss'. beforeunload is always dismissed.",
+    { behavior: z.enum(["accept", "dismiss"]) },
+    async ({ behavior }) => {
+      browser.setDialogBehavior(behavior);
+      return text({ dialogBehavior: behavior });
+    }
+  );
+
+  server.tool(
+    "browser_downloads",
+    "List files downloaded during this session (url, filename, saved path).",
+    {},
+    async () => text(browser.getDownloads())
   );
 
   // --- Allowlist management ---
