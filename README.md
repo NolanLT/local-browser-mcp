@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/NolanLT/local-browser-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/NolanLT/local-browser-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 
 A **headless, agent-controllable real browser** as an [MCP](https://modelcontextprotocol.io)
 server. It gives an AI agent (Claude Code, or any MCP client) a real Playwright browser pointed at
@@ -15,7 +15,7 @@ without general-web-browsing risk; additional hosts are opt-in.
 
 ## Install
 
-Requires **Node.js ≥ 18**. The Chromium binary (~110 MB) is downloaded automatically on first
+Requires **Node.js ≥ 20**. The Chromium binary (~110 MB) is downloaded automatically on first
 install.
 
 ### Claude Code / any MCP client (recommended)
@@ -38,8 +38,9 @@ Add it to your MCP config (e.g. a project `.mcp.json`, your user config via
 }
 ```
 
-Restart your client. The `browser_*` tools appear with no other setup. (First run installs
-dependencies and downloads Chromium, then caches.)
+Restart your client. The tools appear with no other setup — MCP namespaces them under the server
+name, so they show up as `local-browser: navigate`, `local-browser: click`, and so on. (First run
+installs dependencies and downloads Chromium, then caches.)
 
 > If the package is also published to npm, you can swap the arg for the shorter
 > `["-y", "local-browser-mcp"]`.
@@ -71,7 +72,7 @@ stdio only reaches clients on the same machine. To use this from **claude.ai** (
 **Cowork**, or a **Desktop custom connector**, run it in **HTTP mode** and expose it over public
 HTTPS — Anthropic's cloud connects to *your* endpoint, so it must be reachable and authenticated.
 
-> ⚠️ **A public endpoint can drive a real browser, including `browser_eval`.** Always set
+> ⚠️ **A public endpoint can drive a real browser, including `eval`.** Always set
 > `LOCAL_BROWSER_TOKEN` and keep a tight `LOCAL_BROWSER_ALLOWED_HOSTS` (and `LOCAL_BROWSER_ALLOW_ALL=false`)
 > before exposing it. Without a token the HTTP path is unauthenticated.
 
@@ -104,34 +105,34 @@ serverless edge, which can't spawn Chromium). Set `LOCAL_BROWSER_HTTP_HOST=0.0.0
 
 | Tool | Purpose |
 |------|---------|
-| `browser_navigate({ url })` | Go to a URL (allowlist-validated) |
-| `browser_screenshot({ fullPage?, selector?, format?, quality? })` | Image to the agent; `format: "jpeg"` (+`quality` 1-100) for lighter captures, else PNG |
-| `browser_snapshot()` | Flat DOM/a11y snapshot `{ tag, role, text, ref }` |
-| `browser_click({ selector \| ref })` | Click an element |
-| `browser_hover({ selector \| ref })` | Hover (e.g. open a dropdown) |
-| `browser_fill({ selector, value })` | Fill an input |
-| `browser_type({ text })` | Type into the focused element |
-| `browser_press_key({ key })` | Press a key/chord (Enter, Tab, Escape, Control+A, …) |
-| `browser_eval({ expression })` | Run JS in the page, return JSON result |
-| `browser_console()` / `browser_network()` | Buffered console / recent requests |
-| `browser_wait_for({ selector?, text?, timeoutMs? })` | Wait for a condition |
-| `browser_resize({ width, height })` | Resize the viewport |
-| `browser_reload()` / `browser_back()` / `browser_forward()` | History nav |
-| `browser_get_text()` | Visible page text |
-| `browser_tabs()` / `browser_new_tab({ url? })` / `browser_switch_tab({ index })` / `browser_close_tab({ index? })` | Tabs & popups |
-| `browser_dialogs()` / `browser_set_dialog_behavior({ behavior })` | JS dialogs (auto-handled; accept/dismiss) |
-| `browser_downloads()` | Files downloaded this session (saved to `LOCAL_BROWSER_DOWNLOAD_DIR`) |
-| `browser_allow_host` / `browser_disallow_host` / `browser_list_allowed` | Allowlist management |
+| `navigate({ url })` | Go to a URL (allowlist-validated) |
+| `screenshot({ fullPage?, selector?, format?, quality? })` | Image to the agent; `format: "jpeg"` (+`quality` 1-100) for lighter captures, else PNG |
+| `snapshot()` | Flat DOM/a11y snapshot `{ tag, role, text, ref }` |
+| `click({ selector \| ref })` | Click an element |
+| `hover({ selector \| ref })` | Hover (e.g. open a dropdown) |
+| `fill({ selector, value })` | Fill an input |
+| `type({ text })` | Type into the focused element |
+| `press_key({ key })` | Press a key/chord (Enter, Tab, Escape, Control+A, …) |
+| `eval({ expression })` | Run JS in the page, return JSON result |
+| `console()` / `network()` | Buffered console / recent requests |
+| `wait_for({ selector?, text?, timeoutMs? })` | Wait for a condition |
+| `resize({ width, height })` | Resize the viewport |
+| `reload()` / `back()` / `forward()` | History nav |
+| `get_text()` | Visible page text |
+| `tabs()` / `new_tab({ url? })` / `switch_tab({ index })` / `close_tab({ index? })` | Tabs & popups |
+| `dialogs()` / `set_dialog_behavior({ behavior })` | JS dialogs (auto-handled; accept/dismiss) |
+| `downloads()` | Files downloaded this session (saved to `LOCAL_BROWSER_DOWNLOAD_DIR`) |
+| `allow_host` / `disallow_host` / `list_allowed` | Allowlist management |
 
-`ref` values come from `browser_snapshot()` (elements are tagged with `data-lbmcp-ref`), so
-`browser_click({ ref })` targets them reliably.
+`ref` values come from `snapshot()` (elements are tagged with `data-lbmcp-ref`), so
+`click({ ref })` targets them reliably.
 
 ## Security
 
 - Navigation is rejected unless the host is in `LOCAL_BROWSER_ALLOWED_HOSTS` (or `ALLOW_ALL` is on)
   and the protocol is http/https.
 - The browser uses a **fresh, ephemeral profile** — no saved cookies, logins, or passwords.
-- `browser_eval` runs arbitrary JS with the page's full privileges. Harmless on your own dev site;
+- `eval` runs arbitrary JS with the page's full privileges. Harmless on your own dev site;
   powerful on a real one. With `ALLOW_ALL` on, every visited page is untrusted input (prompt-
   injection surface) and the agent can script it — keep `ALLOW_ALL` off unless you mean it.
 - There's no built-in approval dialog (the server is headless). When run under Claude Code, host

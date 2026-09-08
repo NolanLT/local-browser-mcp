@@ -280,7 +280,7 @@ export class LocalBrowser {
     if (!this.allowAll && !this.allowed.has(host)) {
       throw new Error(
         `Blocked host "${host}". Allowed: ${[...this.allowed].join(", ")}. ` +
-          `Use browser_allow_host to request access, or set localBrowser.allowAllHosts.`
+          "Use allow_host to request access, or set LOCAL_BROWSER_ALLOW_ALL=true."
       );
     }
     return parsed;

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-08
+
+### Changed
+- **BREAKING — tool names dropped the `browser_` prefix.** MCP already namespaces tools under the
+  server name, so `local-browser: browser_navigate` was saying "browser" twice. All 27 tools were
+  renamed: `browser_navigate` → `navigate`, `browser_click` → `click`, `browser_eval` → `eval`,
+  and so on. No aliases are kept — update any saved prompts, permission rules, or hooks that name
+  the old tools.
+- **Node.js ≥ 20 is now required** (was ≥ 20 in practice already: Playwright dropped Node 18, so
+  the declared `>=18` floor was untrue). CI now builds on Node 20/22/24.
+- Dependency bumps: playwright 1.63, esbuild 0.28.2, zod 4.5.4.
+
+### Fixed
+- The MCP handshake reported a hardcoded `version: "0.1.0"`; it now reports the real package
+  version, injected at build time.
+- The "blocked host" error pointed at `localBrowser.allowAllHosts`, a VS Code setting that does
+  not exist in the standalone server — it now names `LOCAL_BROWSER_ALLOW_ALL`.
+- Patched transitive advisories in `fast-uri` (SSRF / host confusion, high) and `qs` (array-limit
+  bypass, DoS). `npm audit` is clean.
+
+### Added
+- `npm test` — a dependency-free smoke test that spawns the built server, completes the MCP
+  handshake, and asserts the full tool list, the reported version, and that stdout carries only
+  JSON-RPC. Runs in CI.
+- Dependabot config for weekly npm and GitHub Actions updates.
+
 ## [0.3.0] - 2026-08-04
 
 ### Added
@@ -69,6 +95,8 @@ No VS Code required.
 - **Claude Code plugin marketplace** (`/plugin marketplace add NolanLT/local-browser-mcp`).
 - Chromium binary downloaded automatically on install (`postinstall`), skippable via env.
 
-[Unreleased]: https://github.com/NolanLT/local-browser-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/NolanLT/local-browser-mcp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/NolanLT/local-browser-mcp/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/NolanLT/local-browser-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/NolanLT/local-browser-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/NolanLT/local-browser-mcp/releases/tag/v0.1.0

@@ -1,6 +1,6 @@
 {
   "name": "local-browser-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A headless, agent-controllable real browser as an MCP server — for local dev servers and allowlisted hosts. No VS Code required.",
   "keywords": [
     "mcp",
@@ -38,20 +38,21 @@
     "build": "node esbuild.js --production",
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/smoke.cjs",
     "prepare": "npm run build",
     "postinstall": "node scripts/postinstall.cjs"
   },
   "dependencies": {
-    "playwright": "^1.62.0"
+    "playwright": "^1.63.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/node": "^22.0.0",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.5.0",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

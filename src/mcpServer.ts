@@ -8,6 +8,9 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { LocalBrowser } from "./browser";
 
+/** Replaced at build time by esbuild `define` with the package.json version. */
+declare const __VERSION__: string;
+
 function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -87,7 +90,7 @@ function imageContent(buf: Buffer, mimeType: string, note?: string) {
 export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): McpServer {
   const server = new McpServer({
     name: "local-browser-mcp",
-    version: "0.1.0"
+    version: typeof __VERSION__ === "string" ? __VERSION__ : "0.0.0-dev"
   });
 
   // Surface a discrete agent action as a notification (no-op if no UI hook).
@@ -95,7 +98,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
 
   if (hooks.onShowPanel) {
     server.tool(
-      "browser_show_panel",
+      "show_panel",
       "Ensure the Local Browser is running (headless) and preload the default URL. The browser has no visual panel; actions surface as VS Code notifications. Safe to call anytime.",
       {},
       async () => {
@@ -106,7 +109,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   }
 
   server.tool(
-    "browser_navigate",
+    "navigate",
     "Navigate the browser to a local dev URL (validated against the localhost allowlist).",
     { url: z.string().describe("URL to load, e.g. http://localhost:8787") },
     async ({ url }) => {
@@ -125,7 +128,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_screenshot",
+    "screenshot",
     "Capture a screenshot of the current page (optionally full page or a single element). Use format 'jpeg' (with optional quality 1-100) for a lighter, faster capture; 'png' (default) is lossless.",
     {
       fullPage: z.boolean().optional(),
@@ -141,8 +144,8 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_snapshot",
-    "Return a flat accessibility/DOM snapshot (tag, role, text, ref) for element targeting. Use a returned `ref` with browser_click.",
+    "snapshot",
+    "Return a flat accessibility/DOM snapshot (tag, role, text, ref) for element targeting. Use a returned `ref` with `click`.",
     {},
     async () => {
       const nodes = await browser.snapshot();
@@ -152,8 +155,8 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_click",
-    "Click an element by CSS selector or by a ref from browser_snapshot.",
+    "click",
+    "Click an element by CSS selector or by a ref from snapshot.",
     {
       selector: z.string().optional(),
       ref: z.string().optional()
@@ -166,7 +169,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_hover",
+    "hover",
     "Hover the mouse over an element (by CSS selector or snapshot ref) — e.g. to open a dropdown menu.",
     {
       selector: z.string().optional(),
@@ -180,7 +183,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_fill",
+    "fill",
     "Fill an input/textarea identified by a CSS selector with the given value.",
     {
       selector: z.string(),
@@ -194,7 +197,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_type",
+    "type",
     "Type text using the keyboard into the currently focused element.",
     { text: z.string() },
     async ({ text: t }) => {
@@ -205,7 +208,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_press_key",
+    "press_key",
     "Press a key or chord on the keyboard (e.g. \"Enter\", \"Tab\", \"Escape\", \"ArrowDown\", \"Control+A\"). Useful to submit forms or navigate without a mouse.",
     { key: z.string().describe('Key name or chord, e.g. "Enter" or "Control+A"') },
     async ({ key }) => {
@@ -216,7 +219,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_eval",
+    "eval",
     "Evaluate a JavaScript expression in the page context and return the JSON-serializable result. On non-local pages this prompts the user for confirmation first.",
     { expression: z.string() },
     async ({ expression }) => {
@@ -240,21 +243,21 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_console",
+    "console",
     "Return buffered console messages (log/warn/error) captured from the page.",
     {},
     async () => text(browser.getConsole())
   );
 
   server.tool(
-    "browser_network",
+    "network",
     "Return recent network requests (method, url, status, resourceType).",
     {},
     async () => text(browser.getNetwork())
   );
 
   server.tool(
-    "browser_wait_for",
+    "wait_for",
     "Wait for a selector to become visible, for text to appear, or for a short delay.",
     {
       selector: z.string().optional(),
@@ -268,7 +271,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_resize",
+    "resize",
     "Resize the page viewport.",
     { width: z.number(), height: z.number() },
     async ({ width, height }) => {
@@ -278,19 +281,19 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     }
   );
 
-  server.tool("browser_reload", "Reload the current page.", {}, async () => {
+  server.tool("reload", "Reload the current page.", {}, async () => {
     await browser.reload();
     act("Reloaded the page");
     return text({ reloaded: browser.currentUrl });
   });
 
-  server.tool("browser_back", "Navigate back in history.", {}, async () => {
+  server.tool("back", "Navigate back in history.", {}, async () => {
     await browser.back();
     act("Went back");
     return text({ url: browser.currentUrl });
   });
 
-  server.tool("browser_forward", "Navigate forward in history.", {}, async () => {
+  server.tool("forward", "Navigate forward in history.", {}, async () => {
     await browser.forward();
     act("Went forward");
     return text({ url: browser.currentUrl });
@@ -298,7 +301,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
 
   // Stretch: quick content extraction.
   server.tool(
-    "browser_get_text",
+    "get_text",
     "Return the visible text content of the page body.",
     {},
     async () => {
@@ -311,14 +314,14 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   // --- Tabs ---
 
   server.tool(
-    "browser_tabs",
+    "tabs",
     "List open tabs (index, url, title, and which is active).",
     {},
     async () => text(await browser.listTabs())
   );
 
   server.tool(
-    "browser_new_tab",
+    "new_tab",
     "Open a new tab (optionally navigating to a URL) and make it active. Returns the updated tab list.",
     { url: z.string().optional() },
     async ({ url }) => {
@@ -329,8 +332,8 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_switch_tab",
-    "Switch the active tab by index (see browser_tabs).",
+    "switch_tab",
+    "Switch the active tab by index (see `tabs`).",
     { index: z.number() },
     async ({ index }) => {
       const tabs = await browser.switchTab(index);
@@ -340,7 +343,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_close_tab",
+    "close_tab",
     "Close a tab by index, or the active tab if no index is given. Returns the updated tab list.",
     { index: z.number().optional() },
     async ({ index }) => {
@@ -353,14 +356,14 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   // --- Dialogs & downloads ---
 
   server.tool(
-    "browser_dialogs",
+    "dialogs",
     "Return JS dialogs (alert/confirm/prompt/beforeunload) the page has raised, and how each was handled.",
     {},
     async () => text(browser.getDialogs())
   );
 
   server.tool(
-    "browser_set_dialog_behavior",
+    "set_dialog_behavior",
     "Set how JS dialogs are auto-handled: 'accept' (default) or 'dismiss'. beforeunload is always dismissed.",
     { behavior: z.enum(["accept", "dismiss"]) },
     async ({ behavior }) => {
@@ -370,7 +373,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_downloads",
+    "downloads",
     "List files downloaded during this session (url, filename, saved path).",
     {},
     async () => text(browser.getDownloads())
@@ -379,14 +382,14 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   // --- Allowlist management ---
 
   server.tool(
-    "browser_list_allowed",
+    "list_allowed",
     "List the hosts the browser may navigate to, and whether all hosts are allowed.",
     {},
     async () => text(browser.getAllowed())
   );
 
   server.tool(
-    "browser_allow_host",
+    "allow_host",
     "Request permission to add a host (e.g. \"github.com\") to the navigation allowlist. The user is asked to approve; returns whether it was granted.",
     { host: z.string().describe("Hostname to allow, e.g. github.com") },
     async ({ host }) => {
@@ -401,7 +404,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
   );
 
   server.tool(
-    "browser_disallow_host",
+    "disallow_host",
     "Remove a host from the navigation allowlist.",
     { host: z.string() },
     async ({ host }) => {

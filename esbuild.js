@@ -16,6 +16,7 @@ const build = {
   target: "node18",
   outfile: "dist/server.cjs",
   external: ["playwright"],
+  define: { __VERSION__: JSON.stringify(require("./package.json").version) },
   banner: { js: "#!/usr/bin/env node" },
   sourcemap: false,
   minify: production,
