@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-09-08
 
+### Removed
+- The `ServerHooks` machinery and the `show_panel` tool — leftovers from the VS Code extension this
+  package replaced. Nothing in this repo ever passed hooks, so every branch on them was dead: the
+  activity-notification calls, the panel error banner, the allow-host and eval confirmation
+  prompts, and `LocalBrowser.isLocalUrl` / `LOCAL_HOSTS` / `setAllowedHosts` / `setAllowAllHosts`.
+  `buildServer(browser)` now takes one argument. Tool behavior is unchanged (the gate was already
+  the client's own per-tool approval); the tool list drops from 28 to 27 by losing `show_panel`,
+  which was only ever registered when hooks were supplied.
+
 ### Changed
 - **BREAKING — tool names dropped the `browser_` prefix.** MCP already namespaces tools under the
   server name, so `local-browser: browser_navigate` was saying "browser" twice. All 27 tools were
@@ -23,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The MCP handshake reported a hardcoded `version: "0.1.0"`; it now reports the real package
   version, injected at build time.
 - The "blocked host" error pointed at `localBrowser.allowAllHosts`, a VS Code setting that does
-  not exist in the standalone server — it now names `LOCAL_BROWSER_ALLOW_ALL`.
+  not exist here — it now names `LOCAL_BROWSER_ALLOW_ALL`.
 - Patched transitive advisories in `fast-uri` (SSRF / host confusion, high) and `qs` (array-limit
   bypass, DoS). `npm audit` is clean.
 
@@ -32,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handshake, and asserts the full tool list, the reported version, and that stdout carries only
   JSON-RPC. Runs in CI.
 - Dependabot config for weekly npm and GitHub Actions updates.
+
+### Docs
+- README, CONTRIBUTING, and the plugin/marketplace descriptions no longer define this package by
+  what it is not ("no VS Code required"), and CONTRIBUTING's hand-rolled JSON-RPC smoke-test
+  snippet is replaced by `npm test`.
 
 ## [0.3.0] - 2026-08-04
 

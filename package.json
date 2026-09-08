@@ -1,7 +1,7 @@
 {
   "name": "local-browser-mcp",
   "version": "0.4.0",
-  "description": "A headless, agent-controllable real browser as an MCP server — for local dev servers and allowlisted hosts. No VS Code required.",
+  "description": "A headless, agent-controllable real browser as an MCP server — for local dev servers and allowlisted hosts.",
   "keywords": [
     "mcp",
     "model-context-protocol",

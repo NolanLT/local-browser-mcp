@@ -83,10 +83,9 @@ export class LocalBrowser {
   private readonly dialogs: DialogEntry[] = [];
   private readonly downloads: DownloadEntry[] = [];
   private _currentUrl = "about:blank";
-  // Mutable so the allowlist can be changed at runtime (via tools / settings)
-  // without relaunching the browser.
-  private allowed: Set<string>;
-  private allowAll: boolean;
+  // Mutable so allow_host / disallow_host take effect without a relaunch.
+  private readonly allowed: Set<string>;
+  private readonly allowAll: boolean;
   private dialogBehavior: DialogBehavior = "accept";
   private readonly downloadDir: string;
 
@@ -100,23 +99,6 @@ export class LocalBrowser {
     return this.opts.engine;
   }
 
-  /** Hosts that count as "local" — eval there never needs confirmation. */
-  static readonly LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1", ""];
-
-  isLocalUrl(rawUrl: string): boolean {
-    try {
-      return LocalBrowser.LOCAL_HOSTS.includes(new URL(rawUrl).hostname);
-    } catch {
-      return true; // about:blank etc.
-    }
-  }
-
-  setAllowedHosts(hosts: string[]): void {
-    this.allowed = new Set(hosts);
-  }
-  setAllowAllHosts(value: boolean): void {
-    this.allowAll = value;
-  }
   allowHost(host: string): void {
     this.allowed.add(host);
   }
@@ -308,7 +290,7 @@ export class LocalBrowser {
       return { url: page.url(), ok: true, status: resp?.status() };
     } catch (err) {
       // Dev server may not be up yet — return a structured result rather than
-      // throwing, so the agent gets a clear error and a toast can report it.
+      // throwing, so the agent gets a clear error it can act on.
       return { url, ok: false, error: (err as Error).message };
     }
   }

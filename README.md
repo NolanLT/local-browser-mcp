@@ -5,13 +5,13 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 
 A **headless, agent-controllable real browser** as an [MCP](https://modelcontextprotocol.io)
-server. It gives an AI agent (Claude Code, or any MCP client) a real Playwright browser pointed at
-your **local dev servers** — and any hosts you explicitly allow — with **no VS Code and no GUI
-required**. The agent launches the browser, drives it, and it's torn down when the session ends.
+server. It gives an agent (Claude Code, or any MCP client) a real Playwright browser pointed at
+your **local dev servers** — and any hosts you explicitly allow. Navigate, click, hover, fill,
+type, run JS, screenshot, snapshot the DOM, and read console/network, all over MCP.
 
-Navigate, click, hover, fill, type, run JS, screenshot, snapshot the DOM, and read console/network
-— all over MCP. Because it normally only drives *your own localhost*, it's given broad control
-without general-web-browsing risk; additional hosts are opt-in.
+The agent launches the browser, drives it headlessly, and it's torn down when the session ends.
+Because it normally only drives *your own localhost*, it can be given broad control without
+general-web-browsing risk; additional hosts are opt-in.
 
 ## Install
 
@@ -147,9 +147,10 @@ serverless edge, which can't spawn Chromium). Set `LOCAL_BROWSER_HTTP_HOST=0.0.0
 npm install        # installs deps + downloads Chromium
 npm run typecheck  # tsc --noEmit
 npm run build      # bundle → dist/server.cjs
+npm test           # spawn the built server, assert the MCP handshake + tool list
 ```
 
-Run it directly for a stdio smoke test:
+Run it by hand over stdio (it waits for JSON-RPC on stdin):
 
 ```bash
 node dist/server.cjs

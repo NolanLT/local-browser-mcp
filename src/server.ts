@@ -1,18 +1,15 @@
 /**
- * Standalone Local Browser MCP server — no VS Code required.
+ * Local Browser MCP server — a headless Playwright browser driven over MCP.
  *
- * This is the "baked into Claude" build: Claude Code spawns this process as a
- * plugin MCP server (stdio), and it owns a headless Playwright browser directly.
- * Same browser + same tools as the VS Code extension, minus the extension host,
- * the HTTP server, the port, and the bridge hop. The browser's lifecycle is tied
- * to this process, so it starts when Claude connects and is torn down on exit.
+ * This process owns the browser directly: it launches on the first tool call and
+ * is torn down when the process exits, so the browser's lifetime is the session's.
  *
  * Two transports, selected at runtime by env:
- *   - Default (no LOCAL_BROWSER_HTTP_PORT): stdio — for Claude Code / Desktop
- *     local plugins. Spawned via .mcp.json; lifecycle tied to the stdio pipe.
- *   - LOCAL_BROWSER_HTTP_PORT set: Streamable HTTP at /mcp — for claude.ai
- *     web/mobile, Cowork, and Desktop custom connectors (reached over a public
- *     HTTPS URL via a tunnel/reverse proxy).
+ *   - Default (no LOCAL_BROWSER_HTTP_PORT): stdio — for local MCP clients that
+ *     spawn the server themselves (Claude Code, Claude Desktop) via .mcp.json.
+ *   - LOCAL_BROWSER_HTTP_PORT set: Streamable HTTP at /mcp — for clients that
+ *     connect to a URL instead (claude.ai web/mobile, custom connectors), reached
+ *     over public HTTPS via a tunnel or reverse proxy.
  *
  * Configuration is via environment variables:
  *   LOCAL_BROWSER_ENGINE         chromium | firefox | webkit   (default chromium)
@@ -23,10 +20,9 @@
  *   LOCAL_BROWSER_TOKEN          if set, HTTP requests need `Authorization: Bearer <token>`
  *   LOCAL_BROWSER_DOWNLOAD_DIR   where downloads are saved (default <tmp>/local-browser-downloads)
  *
- * In stdio mode there's no GUI, so the confirmation toasts (allow-host,
- * confirm-eval) are not wired — those gates fall back to Claude Code's own
- * per-tool permission prompts. In HTTP mode the bearer token is the gate, so
- * set LOCAL_BROWSER_TOKEN before any public exposure.
+ * There is no GUI and no approval dialog. Over stdio the gate is the client's own
+ * per-tool permission prompt; over HTTP it's the bearer token, so set
+ * LOCAL_BROWSER_TOKEN before any public exposure.
  *
  * IMPORTANT: in stdio mode, stdout is the JSON-RPC channel. Never write to
  * stdout; all diagnostics go to stderr.
@@ -93,8 +89,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  // ---- Default: stdio mode (Claude Code / Desktop). UNCHANGED. ----
-  // No hooks: headless + standalone, gating handled by Claude Code permissions.
+  // ---- Default: stdio mode (Claude Code / Desktop). ----
+  // Headless: gating is the client's own per-tool permission prompts.
   const server = buildServer(browser);
   await server.connect(new StdioServerTransport());
 
@@ -116,7 +112,7 @@ async function main(): Promise<void> {
   // When Claude closes the stdio pipe, exit so we don't leave a browser running.
   process.stdin.on("close", shutdown);
 
-  console.error("[local-browser] standalone MCP server ready (headless).");
+  console.error("[local-browser] MCP server ready (stdio, headless).");
 }
 
 main().catch((err) => {

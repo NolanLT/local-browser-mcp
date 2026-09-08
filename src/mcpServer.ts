@@ -52,23 +52,6 @@ export interface StartOptions {
    * REQUIRED before any public exposure — the HTTP path has no per-call user prompt.
    */
   bearerToken?: string;
-  /** Optional UI hooks (unused in the standalone build). */
-  hooks?: ServerHooks;
-}
-
-export interface ServerHooks {
-  /** Ensure the (headless) browser is running and preload the default URL. */
-  onShowPanel?: () => void | Promise<void>;
-  /** Ask the user (toast) to add a host to the allowlist. Returns whether granted. */
-  onAllowHost?: (host: string) => Promise<boolean>;
-  /** Remove a host from the allowlist (no prompt — tightening is always safe). */
-  onDisallowHost?: (host: string) => Promise<void>;
-  /** Ask the user (toast) to permit an eval on a non-local page. Returns whether allowed. */
-  onConfirmEval?: (host: string, expression: string) => Promise<boolean>;
-  /** Report an agent navigation result so the panel can show/clear an error banner. */
-  onNavigated?: (url: string, ok: boolean, error?: string) => void;
-  /** Surface a discrete agent action (click, type, eval, …) as a notification. */
-  onActivity?: (message: string) => void;
 }
 
 function text(value: unknown) {
@@ -87,26 +70,11 @@ function imageContent(buf: Buffer, mimeType: string, note?: string) {
   return { content };
 }
 
-export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): McpServer {
+export function buildServer(browser: LocalBrowser): McpServer {
   const server = new McpServer({
     name: "local-browser-mcp",
     version: typeof __VERSION__ === "string" ? __VERSION__ : "0.0.0-dev"
   });
-
-  // Surface a discrete agent action as a notification (no-op if no UI hook).
-  const act = (message: string) => hooks.onActivity?.(message);
-
-  if (hooks.onShowPanel) {
-    server.tool(
-      "show_panel",
-      "Ensure the Local Browser is running (headless) and preload the default URL. The browser has no visual panel; actions surface as VS Code notifications. Safe to call anytime.",
-      {},
-      async () => {
-        await hooks.onShowPanel!();
-        return text({ started: true });
-      }
-    );
-  }
 
   server.tool(
     "navigate",
@@ -114,15 +82,11 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     { url: z.string().describe("URL to load, e.g. http://localhost:8787") },
     async ({ url }) => {
       try {
-        const result = await browser.navigate(url);
-        hooks.onNavigated?.(url, result.ok, result.error);
-        return text(result);
+        return text(await browser.navigate(url));
       } catch (err) {
-        // e.g. blocked host / invalid URL throw before navigation — return a
-        // structured result and surface it in the panel too.
-        const message = (err as Error).message;
-        hooks.onNavigated?.(url, false, message);
-        return text({ url, ok: false, error: message });
+        // A blocked host / invalid URL throws before navigation — return it as a
+        // structured result rather than an MCP error.
+        return text({ url, ok: false, error: (err as Error).message });
       }
     }
   );
@@ -138,7 +102,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     },
     async ({ fullPage, selector, format, quality }) => {
       const { buffer, mimeType } = await browser.screenshot({ fullPage, selector, format, quality });
-      act(selector ? `Screenshot of ${selector}` : "Took a screenshot");
       return imageContent(buffer, mimeType, `Screenshot of ${browser.currentUrl}`);
     }
   );
@@ -149,7 +112,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     {},
     async () => {
       const nodes = await browser.snapshot();
-      act(`Snapshotted the page (${nodes.length} elements)`);
       return text(nodes);
     }
   );
@@ -163,7 +125,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     },
     async ({ selector, ref }) => {
       await browser.click({ selector, ref });
-      act(`Clicked ${selector ?? ref}`);
       return text({ clicked: selector ?? ref });
     }
   );
@@ -177,7 +138,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     },
     async ({ selector, ref }) => {
       await browser.hover({ selector, ref });
-      act(`Hovered ${selector ?? ref}`);
       return text({ hovered: selector ?? ref });
     }
   );
@@ -191,7 +151,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     },
     async ({ selector, value }) => {
       await browser.fill(selector, value);
-      act(`Filled ${selector}`);
       return text({ filled: selector });
     }
   );
@@ -202,7 +161,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     { text: z.string() },
     async ({ text: t }) => {
       await browser.type(t);
-      act(`Typed ${t.length} character${t.length === 1 ? "" : "s"}`);
       return text({ typed: t.length });
     }
   );
@@ -213,33 +171,15 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     { key: z.string().describe('Key name or chord, e.g. "Enter" or "Control+A"') },
     async ({ key }) => {
       await browser.pressKey(key);
-      act(`Pressed ${key}`);
       return text({ pressed: key });
     }
   );
 
   server.tool(
     "eval",
-    "Evaluate a JavaScript expression in the page context and return the JSON-serializable result. On non-local pages this prompts the user for confirmation first.",
+    "Evaluate a JavaScript expression in the page context and return the JSON-serializable result. Runs with the page's full privileges — the client's own per-tool approval is the gate.",
     { expression: z.string() },
-    async ({ expression }) => {
-      // Gate eval on real (non-local) pages behind a user confirmation.
-      if (!browser.isLocalUrl(browser.currentUrl) && hooks.onConfirmEval) {
-        let host = browser.currentUrl;
-        try {
-          host = new URL(browser.currentUrl).hostname;
-        } catch {
-          /* keep raw */
-        }
-        const ok = await hooks.onConfirmEval(host, expression);
-        if (!ok) {
-          return text({ refused: true, reason: `eval on "${host}" was denied by the user` });
-        }
-      }
-      const result = await browser.evaluate(expression);
-      act("Ran JavaScript on the page");
-      return text({ result });
-    }
+    async ({ expression }) => text({ result: await browser.evaluate(expression) })
   );
 
   server.tool(
@@ -276,26 +216,22 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     { width: z.number(), height: z.number() },
     async ({ width, height }) => {
       await browser.resize(width, height);
-      act(`Resized viewport to ${width}×${height}`);
       return text({ width, height });
     }
   );
 
   server.tool("reload", "Reload the current page.", {}, async () => {
     await browser.reload();
-    act("Reloaded the page");
     return text({ reloaded: browser.currentUrl });
   });
 
   server.tool("back", "Navigate back in history.", {}, async () => {
     await browser.back();
-    act("Went back");
     return text({ url: browser.currentUrl });
   });
 
   server.tool("forward", "Navigate forward in history.", {}, async () => {
     await browser.forward();
-    act("Went forward");
     return text({ url: browser.currentUrl });
   });
 
@@ -306,7 +242,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     {},
     async () => {
       const body = await browser.getText();
-      act("Read the page text");
       return text(body);
     }
   );
@@ -326,7 +261,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     { url: z.string().optional() },
     async ({ url }) => {
       const tabs = await browser.newTab(url);
-      act(url ? `Opened a new tab at ${url}` : "Opened a new tab");
       return text(tabs);
     }
   );
@@ -337,7 +271,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     { index: z.number() },
     async ({ index }) => {
       const tabs = await browser.switchTab(index);
-      act(`Switched to tab ${index}`);
       return text(tabs);
     }
   );
@@ -348,7 +281,6 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     { index: z.number().optional() },
     async ({ index }) => {
       const tabs = await browser.closeTab(index);
-      act(index === undefined ? "Closed the active tab" : `Closed tab ${index}`);
       return text(tabs);
     }
   );
@@ -390,14 +322,9 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
 
   server.tool(
     "allow_host",
-    "Request permission to add a host (e.g. \"github.com\") to the navigation allowlist. The user is asked to approve; returns whether it was granted.",
+    "Add a host (e.g. \"github.com\") to the navigation allowlist for this session. The client's own per-tool approval is the gate.",
     { host: z.string().describe("Hostname to allow, e.g. github.com") },
     async ({ host }) => {
-      if (hooks.onAllowHost) {
-        const granted = await hooks.onAllowHost(host);
-        return text({ host, granted });
-      }
-      // No UI hook (e.g. standalone server) — allow directly.
       browser.allowHost(host);
       return text({ host, granted: true });
     }
@@ -408,11 +335,7 @@ export function buildServer(browser: LocalBrowser, hooks: ServerHooks = {}): Mcp
     "Remove a host from the navigation allowlist.",
     { host: z.string() },
     async ({ host }) => {
-      if (hooks.onDisallowHost) {
-        await hooks.onDisallowHost(host);
-      } else {
-        browser.disallowHost(host);
-      }
+      browser.disallowHost(host);
       return text({ host, removed: true });
     }
   );
@@ -435,7 +358,7 @@ export async function startMcpServer(
   port: number,
   opts: StartOptions = {}
 ): Promise<McpServerHandle> {
-  const { host = "127.0.0.1", tls, bearerToken, hooks = {} } = opts;
+  const { host = "127.0.0.1", tls, bearerToken } = opts;
   const transports = new Map<string, SSEServerTransport>();
   const streamable = new Map<string, StreamableHTTPServerTransport>();
   const scheme = tls ? "https" : "http";
@@ -493,7 +416,7 @@ export async function startMcpServer(
               streamable.delete(transport!.sessionId);
             }
           };
-          const server = buildServer(browser, hooks);
+          const server = buildServer(browser);
           await server.connect(transport);
         }
         if (!transport) {
@@ -531,7 +454,7 @@ export async function startMcpServer(
       transports.set(transport.sessionId, transport);
       res.on("close", () => transports.delete(transport.sessionId));
       // Each connection gets its own server instance bound to the shared browser.
-      const server = buildServer(browser, hooks);
+      const server = buildServer(browser);
       await server.connect(transport);
       return;
     }

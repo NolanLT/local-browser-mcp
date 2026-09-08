@@ -4,7 +4,7 @@ Thanks for your interest in improving Local Browser MCP!
 
 ## Development setup
 
-Requires **Node.js ≥ 18**.
+Requires **Node.js ≥ 20**.
 
 ```bash
 git clone https://github.com/NolanLT/local-browser-mcp.git
@@ -22,6 +22,7 @@ before `npm install`.
 | `npm run typecheck` | Type-check with `tsc --noEmit` |
 | `npm run build` | Bundle `src/server.ts` → `dist/server.cjs` (esbuild) |
 | `npm run watch` | Rebuild on change |
+| `npm test` | Smoke test: spawn `dist/server.cjs`, assert the MCP handshake and tool list |
 
 ## Project layout
 
@@ -29,28 +30,27 @@ before `npm install`.
 src/
   browser.ts     Playwright wrapper: page lifecycle, allowlist, snapshot, primitives
   mcpServer.ts   MCP tool definitions (buildServer)
-  server.ts      stdio entry point — wires the browser to the MCP server
+  server.ts      entry point — reads env, picks stdio or HTTP, wires up the browser
 dist/server.cjs  bundled output (generated; not committed)
-scripts/         postinstall (browser download)
+scripts/         postinstall (browser download), smoke.cjs (npm test)
 plugin/          Claude Code plugin manifest + .mcp.json
 ```
 
 ## Smoke test
 
 ```bash
-npm run build
-# pipe an MCP initialize + tools/list to the server over stdio:
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | node dist/server.cjs
+npm run build && npm test
 ```
+
+It spawns the built server, completes the MCP handshake, and asserts the full tool list, the
+reported version, and that stdout carries nothing but JSON-RPC. No browser binary needed. If you
+add, remove, or rename a tool, update `EXPECTED` in `scripts/smoke.cjs`.
 
 ## Pull requests
 
 1. Branch off `master`.
 2. Keep changes focused; match the surrounding code style.
-3. Run `npm run typecheck` and `npm run build` before pushing.
+3. Run `npm run typecheck`, `npm run build`, and `npm test` before pushing.
 4. Update `CHANGELOG.md` under `## [Unreleased]`.
 5. Open a PR using the template.
 
