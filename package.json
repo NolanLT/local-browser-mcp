@@ -47,9 +47,9 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.4.1",
     "esbuild": "^0.28.2",
-    "typescript": "^5.5.0",
+    "typescript": "^7.0.2",
     "zod": "^4.5.4"
   },
   "engines": {
